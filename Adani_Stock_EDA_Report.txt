@@ -1,0 +1,126 @@
+Exploratory Data Analysis (EDA) Report - Adani Stock Data
+
+### Introduction:
+This report presents an extensive exploratory data analysis (EDA) of the Adani stock dataset. Various SQL queries are used to extract insights related to stock performance, volatility, trends, and relationships between different financial metrics.
+
+### Step 1: Identify Consecutive Days with the Highest Percentage Increase in Closing Price
+This query identifies the top 10 days where stock prices increased the most compared to the previous day.
+
+```sql
+SELECT symbol, company, `timestamp`,
+       `close` AS closing_price,
+       LAG(`close`) OVER (PARTITION BY symbol ORDER BY `timestamp`) AS prev_closing_price,
+       ROUND((( `close` - LAG(`close`) OVER (PARTITION BY symbol ORDER BY `timestamp`) ) / LAG(`close`) OVER (PARTITION BY symbol ORDER BY `timestamp`) ) * 100, 2) AS daily_percentage_change
+FROM tweets.adani_staging
+ORDER BY daily_percentage_change DESC
+LIMIT 10;
+```
+
+### Step 2: Find the Days with the Highest Percentage Decrease in Closing Price
+This query identifies the 10 worst-performing days.
+
+```sql
+SELECT symbol, company, `timestamp`,
+       `close` AS closing_price,
+       LAG(`close`) OVER (PARTITION BY symbol ORDER BY `timestamp`) AS prev_closing_price,
+       ROUND((( `close` - LAG(`close`) OVER (PARTITION BY symbol ORDER BY `timestamp`) ) / LAG(`close`) OVER (PARTITION BY symbol ORDER BY `timestamp`) ) * 100, 2) AS daily_percentage_change
+FROM tweets.adani_staging
+ORDER BY daily_percentage_change ASC
+LIMIT 10;
+```
+
+### Step 3: Compute the Average Daily Price Range for Each Stock
+This calculates the average difference between daily high and low prices.
+
+```sql
+SELECT symbol, company,
+       AVG(high - low) AS avg_daily_range
+FROM tweets.adani_staging
+GROUP BY symbol, company
+ORDER BY avg_daily_range DESC;
+```
+
+### Step 4: Identify Stocks with the Highest Standard Deviation in Closing Price
+This determines which stocks have the most volatility.
+
+```sql
+SELECT symbol, company,
+       STDDEV(`close`) AS closing_price_volatility
+FROM tweets.adani_staging
+GROUP BY symbol, company
+ORDER BY closing_price_volatility DESC
+LIMIT 10;
+```
+
+### Step 5: Find the Month with the Highest Average Trading Volume
+This query finds the month with the highest trading activity.
+
+```sql
+SELECT DATE_FORMAT(FROM_UNIXTIME(`timestamp`), '%Y-%m') AS month,
+       AVG(volume) AS avg_trading_volume
+FROM tweets.adani_staging
+GROUP BY month
+ORDER BY avg_trading_volume DESC
+LIMIT 1;
+```
+
+### Step 6: Analyze the Impact of Stock Splits on Closing Price
+This query examines how stock splits have historically affected stock prices.
+
+```sql
+SELECT symbol, company, `timestamp`,
+       stock_splits,
+       LAG(`close`) OVER (PARTITION BY symbol ORDER BY `timestamp`) AS prev_closing_price,
+       `close` AS new_closing_price,
+       ROUND((( `close` - LAG(`close`) OVER (PARTITION BY symbol ORDER BY `timestamp`) ) / LAG(`close`) OVER (PARTITION BY symbol ORDER BY `timestamp`) ) * 100, 2) AS price_change_percentage
+FROM tweets.adani_staging
+WHERE stock_splits > 0
+ORDER BY `timestamp`;
+```
+
+### Step 7: Check if Higher Dividends Correlate with Stock Price Increases
+This determines if companies that offer higher dividends also see an increase in stock price.
+
+```sql
+SELECT 
+    CORR(dividends, `close`) AS correlation_dividends_closing_price
+FROM tweets.adani_staging;
+```
+
+### Step 8: Identify the Highest Price Gap Between Opening and Closing Price on a Single Day
+This query identifies extreme fluctuations in stock prices within a single day.
+
+```sql
+SELECT symbol, company, `timestamp`,
+       (`close` - `open`) AS price_gap
+FROM tweets.adani_staging
+ORDER BY price_gap DESC
+LIMIT 10;
+```
+
+### Step 9: Analyze the Performance of Stocks in the First and Second Half of the Year
+This query compares stock prices between the first and second half of the year.
+
+```sql
+SELECT symbol, company,
+       AVG(CASE WHEN MONTH(FROM_UNIXTIME(`timestamp`)) <= 6 THEN `close` END) AS avg_price_first_half,
+       AVG(CASE WHEN MONTH(FROM_UNIXTIME(`timestamp`)) > 6 THEN `close` END) AS avg_price_second_half
+FROM tweets.adani_staging
+GROUP BY symbol, company;
+```
+
+### Step 10: Find Stocks with the Most Consistent Price Movements
+This identifies stocks with the least fluctuations.
+
+```sql
+SELECT symbol, company,
+       STDDEV(`close`) AS closing_price_consistency
+FROM tweets.adani_staging
+GROUP BY symbol, company
+ORDER BY closing_price_consistency ASC
+LIMIT 10;
+```
+
+### Conclusion:
+This EDA process provides insights into stock price movements, volatility, trading volumes, stock splits, and the impact of dividends. These queries help understand market trends and investor behaviors.
+

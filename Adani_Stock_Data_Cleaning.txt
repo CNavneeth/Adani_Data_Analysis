@@ -1,0 +1,154 @@
+# Data Cleaning Project: Adani Stock Data
+
+## Project Overview
+The purpose of this project is to clean and preprocess stock data. The dataset contains various stock-related attributes, including timestamps, company names, stock symbols, open and close prices, volume, dividends, and stock splits.
+
+### Key Objectives:
+1. Ensure data integrity by preserving raw data in a separate staging table.
+2. Identify and remove duplicate records.
+3. Standardize text data such as company names and symbols.
+4. Handle NULL values appropriately to avoid inconsistencies.
+5. Optimize the dataset for further analysis by ensuring proper formatting.
+
+---
+
+## 1. Retrieving Raw Data
+Before making modifications, we first examine the original dataset.
+
+```sql
+SELECT * 
+FROM tweets.adani;
+```
+
+This allows us to analyze the dataset structure and identify inconsistencies.
+
+---
+
+## 2. Creating a Staging Table
+To ensure that the original data remains unmodified, we create a **staging table** and copy the entire dataset into it.
+
+```sql
+CREATE TABLE tweets.adani_staging 
+LIKE tweets.adani;
+
+INSERT INTO tweets.adani_staging 
+SELECT * FROM tweets.adani;
+
+SELECT * 
+FROM tweets.adani_staging;
+```
+
+---
+
+## 3. Detecting and Removing Duplicate Records
+We identify duplicate records using the `ROW_NUMBER()` function. Then, we store duplicates in a separate table and remove excess occurrences.
+
+```sql
+SELECT company, symbol, open, close, timestamp,
+       ROW_NUMBER() OVER (
+           PARTITION BY company, symbol, open, close, timestamp
+       ) AS row_num
+FROM adani_staging;
+
+SELECT *
+FROM (
+    SELECT company, symbol, open, close, timestamp,
+           ROW_NUMBER() OVER (
+               PARTITION BY company, symbol, open, close, timestamp
+           ) AS row_num
+    FROM adani_staging
+) duplicates
+WHERE row_num > 1;
+
+CREATE TABLE `adani_staging_duplicates` (
+  `timestamp` BIGINT DEFAULT NULL,
+  `symbol` TEXT,
+  `company` TEXT,
+  `open` DOUBLE DEFAULT NULL,
+  `high` DOUBLE DEFAULT NULL,
+  `low` DOUBLE DEFAULT NULL,
+  `close` DOUBLE DEFAULT NULL,
+  `volume` INT DEFAULT NULL,
+  `dividends` DOUBLE DEFAULT NULL,
+  `stock_splits` DOUBLE DEFAULT NULL,
+  row_num INT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+TRUNCATE TABLE adani_staging_duplicates;
+
+INSERT INTO adani_staging_duplicates
+SELECT *
+FROM (
+    SELECT *,
+           ROW_NUMBER() OVER (
+               PARTITION BY `timestamp`, symbol, company, `open`, high, low, `close`, volume, dividends, stock_splits
+           ) AS row_num
+    FROM adani_staging
+) duplicates;
+
+DELETE FROM adani_staging_duplicates
+WHERE row_num > 1;
+
+SELECT * 
+FROM tweets.adani_staging_duplicates 
+WHERE row_num > 1;
+```
+
+---
+
+## 4. Standardizing Data Formatting
+To maintain consistency, we trim spaces and standardize names for symbols and companies.
+
+```sql
+UPDATE adani_staging_duplicates
+SET symbol = TRIM(symbol);
+
+SELECT DISTINCT company 
+FROM adani_staging_duplicates;
+
+UPDATE adani_staging_duplicates 
+SET symbol = 'ADANIPORTS'
+WHERE symbol LIKE 'ADANIGREEN';
+
+UPDATE adani_staging_duplicates 
+SET company = 'Adani Ports'
+WHERE company LIKE 'Adani Green';
+```
+
+---
+
+## 5. Handling NULL Values
+To avoid missing data, we replace NULL values with appropriate defaults.
+
+```sql
+UPDATE adani_staging_duplicates 
+SET open = COALESCE(open, 0),
+    high = COALESCE(high, 0),
+    low = COALESCE(low, 0),
+    close = COALESCE(close, 0),
+    volume = COALESCE(volume, 0),
+    dividends = COALESCE(dividends, 0),
+    stock_splits = COALESCE(stock_splits, 0);
+
+UPDATE adani_staging_duplicates 
+SET symbol = COALESCE(symbol, 'Unknown'),
+    company = COALESCE(company, 'Unknown');
+
+DELETE FROM adani_staging_duplicates 
+WHERE `timestamp` IS NULL OR symbol IS NULL OR company IS NULL;
+```
+
+---
+
+## 6. Final Clean-Up
+Removing unnecessary columns and ensuring the data is ready for further analysis.
+
+```sql
+ALTER TABLE adani_staging_duplicates
+DROP COLUMN row_num;
+
+SELECT * 
+FROM adani_staging_duplicates;
+```
+
+This completes the data cleaning process, ensuring that the Adani stock dataset is cleaned and formatted for further analysis.
