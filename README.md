@@ -95,6 +95,7 @@ After cleaning, EDA was performed to analyze stock trends and patterns.
 - **`Adani_Stock_Data_Cleaning.txt`** → Full Data Cleaning report
 - **`adani_exploratory_data_analysis.sql`** → SQL script for EDA  
 - **`Adani_Stock_EDA_Report.txt`** → Full EDA report  
+- **`adani.csv.txt`** → Dataset
 
 ---
 
